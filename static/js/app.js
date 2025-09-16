@@ -239,6 +239,12 @@ class TimeTracker {
             return;
         }
 
+        // Validate reference tickets are provided
+        if (!taskData.reference_tickets || taskData.reference_tickets.length === 0) {
+            this.showError('At least one reference ticket is required');
+            return;
+        }
+
         try {
             let response;
             if (this.currentEditingTask) {

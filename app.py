@@ -202,11 +202,16 @@ def create_task():
     if not data or 'description' not in data or 'start_time' not in data or 'end_time' not in data:
         return jsonify({'error': 'Missing required fields'}), 400
     
+    # Validate reference tickets are provided
+    reference_tickets = data.get('reference_tickets', [])
+    if not reference_tickets or len(reference_tickets) == 0:
+        return jsonify({'error': 'At least one reference ticket is required'}), 400
+    
     task_id = tracker.create_task(
         description=data['description'],
         start_time=data['start_time'],
         end_time=data['end_time'],
-        reference_tickets=data.get('reference_tickets', [])
+        reference_tickets=reference_tickets
     )
     
     return jsonify({'task_id': task_id}), 201
@@ -227,6 +232,12 @@ def update_task(task_id):
     
     if not data:
         return jsonify({'error': 'No data provided'}), 400
+    
+    # If reference_tickets are being updated, validate they are provided
+    if 'reference_tickets' in data:
+        reference_tickets = data['reference_tickets']
+        if not reference_tickets or len(reference_tickets) == 0:
+            return jsonify({'error': 'At least one reference ticket is required'}), 400
     
     success = tracker.update_task(task_id, **data)
     
