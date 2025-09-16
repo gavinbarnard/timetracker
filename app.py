@@ -15,10 +15,12 @@ CORS(app)
 
 class TimeTracker:
     def __init__(self):
+        # Connect to Redis server (assumes Redis is running locally or configured separately)
+        redis_password = os.getenv('REDIS_PASSWORD', None)
         self.redis_client = redis.Redis(
             host=os.getenv('REDIS_HOST', 'localhost'),
             port=int(os.getenv('REDIS_PORT', 6379)),
-            password=os.getenv('REDIS_PASSWORD', 'mypassword'),
+            password=redis_password,  # None means no password authentication
             decode_responses=True
         )
         self.key_prefix = "timetracker:tasks:"

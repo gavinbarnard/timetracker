@@ -22,7 +22,7 @@ A Python Flask web application for tracking work time with Redis Stack Server ba
 ## Prerequisites
 
 - Python 3.8+
-- Docker and Docker Compose
+- Redis server (running locally or remotely)
 - Modern web browser
 
 ## Quick Start
@@ -34,16 +34,26 @@ git clone https://github.com/gavinbarnard/timetracker.git
 cd timetracker
 ```
 
-### 2. Start Redis Stack Server
+### 2. Setup Redis Server
 
+Make sure you have Redis server running. You can install and start Redis in several ways:
+
+**Option A: Using system package manager (Ubuntu/Debian):**
 ```bash
-docker-compose up -d
+sudo apt update
+sudo apt install redis-server
+sudo systemctl start redis-server
 ```
 
-This will start Redis Stack Server with:
-- Redis database on port 6379
-- RedisInsight web interface on port 8001
-- Default password: `mypassword`
+**Option B: Using Docker (if you prefer):**
+```bash
+docker run -d -p 6379:6379 redis:latest
+```
+
+**Option C: Using Redis Stack (for JSON functionality):**
+```bash
+docker run -d -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
+```
 
 ### 3. Install Python Dependencies
 
@@ -51,7 +61,16 @@ This will start Redis Stack Server with:
 pip install -r requirements.txt
 ```
 
-### 4. Run the Application
+### 4. Configure Environment (Optional)
+
+Copy the example environment file and customize if needed:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` to match your Redis configuration if it's not running with default settings.
+
+### 5. Run the Application
 
 ```bash
 python app.py
@@ -148,16 +167,28 @@ GET /health
 Environment variables can be set in the `.env` file:
 
 ```env
+# Redis Configuration (only set if different from defaults)
 REDIS_HOST=localhost
 REDIS_PORT=6379
-REDIS_PASSWORD=mypassword
+# REDIS_PASSWORD=your_password  # Uncomment if your Redis requires authentication
+
+# Flask Configuration
 FLASK_DEBUG=True
 FLASK_ENV=development
 ```
 
+### Redis Setup Notes
+
+The application works with:
+- **Standard Redis**: Basic Redis installation (most common)
+- **Redis Stack**: Enhanced Redis with JSON functionality (recommended for better performance)
+- **Redis Cloud**: Remote Redis instance
+
+By default, the app connects to `localhost:6379` with no authentication. Adjust the `.env` file if your Redis setup differs.
+
 ## Data Storage
 
-Tasks are stored as JSON documents in Redis Stack Server with the following structure:
+Tasks are stored as JSON documents in Redis with the following structure:
 
 ```json
 {
@@ -171,14 +202,16 @@ Tasks are stored as JSON documents in Redis Stack Server with the following stru
 }
 ```
 
-## Redis Stack Features
+## Redis Features
 
-The application leverages Redis Stack Server's JSON functionality for:
+The application leverages Redis functionality for:
 
-- **Document Storage**: Tasks stored as native JSON documents
-- **Efficient Querying**: Fast retrieval and filtering
-- **Data Persistence**: Reliable storage with Redis durability
-- **RedisInsight**: Web-based GUI for database management at `http://localhost:8001`
+- **Document Storage**: Tasks stored as JSON documents using Redis JSON commands
+- **Efficient Querying**: Fast retrieval and filtering capabilities
+- **Data Persistence**: Reliable storage with Redis durability options
+- **Set Operations**: Task indexing using Redis sets for quick lookups
+
+**Note**: If using Redis Stack, you can access RedisInsight web interface at `http://localhost:8001` for database management.
 
 ## Development
 
@@ -188,8 +221,7 @@ The application leverages Redis Stack Server's JSON functionality for:
 timetracker/
 ├── app.py                 # Main Flask application
 ├── requirements.txt       # Python dependencies
-├── docker-compose.yml     # Redis Stack Server setup
-├── .env                   # Environment configuration
+├── .env.example          # Environment configuration template
 ├── templates/
 │   └── index.html        # Main web interface
 ├── static/
@@ -197,6 +229,7 @@ timetracker/
 │   │   └── style.css     # Application styling
 │   └── js/
 │       └── app.js        # Frontend JavaScript
+├── test_api.py           # API testing suite
 └── README.md             # This file
 ```
 
@@ -207,13 +240,15 @@ The application runs in debug mode by default, enabling:
 - Detailed error messages
 - Debug toolbar (if installed)
 
-### Accessing RedisInsight
+### Database Management
 
-Visit `http://localhost:8001` to access the RedisInsight web interface for:
+If you're using Redis Stack, you can access the RedisInsight web interface at `http://localhost:8001` for:
 - Viewing stored data
-- Running Redis commands
+- Running Redis commands  
 - Monitoring performance
-- Database management
+- Visual database management
+
+For standard Redis installations, you can use redis-cli or other Redis management tools.
 
 ## Contributing
 
