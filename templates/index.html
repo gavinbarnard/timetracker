@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-clock"></i> Time Tracker</h1>
+            <p>Track your work time with precision</p>
+        </header>
+
+        <main>
+            <div class="controls">
+                <button id="add-task-btn" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add New Task
+                </button>
+                <div class="date-filter">
+                    <label for="start-date">From:</label>
+                    <input type="date" id="start-date">
+                    <label for="end-date">To:</label>
+                    <input type="date" id="end-date">
+                    <button id="filter-btn" class="btn btn-secondary">Filter</button>
+                    <button id="clear-filter-btn" class="btn btn-outline">Clear</button>
+                </div>
+            </div>
+
+            <div id="task-form" class="modal">
+                <div class="modal-content">
+                    <span class="close">&times;</span>
+                    <h2 id="form-title">Add New Task</h2>
+                    <form id="task-form-element">
+                        <div class="form-group">
+                            <label for="description">Description *</label>
+                            <input type="text" id="description" name="description" required>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="start-time">Start Time *</label>
+                                <input type="datetime-local" id="start-time" name="start_time" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="end-time">End Time *</label>
+                                <input type="datetime-local" id="end-time" name="end_time" required>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="reference-tickets">Reference Tickets</label>
+                            <input type="text" id="reference-tickets" name="reference_tickets" 
+                                   placeholder="Separate multiple tickets with commas (e.g., TASK-123, BUG-456)">
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save Task</button>
+                            <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="tasks-section">
+                <h2>Your Tasks</h2>
+                <div id="tasks-container">
+                    <div class="loading">Loading tasks...</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
