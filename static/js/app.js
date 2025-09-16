@@ -2,6 +2,7 @@ class TimeTracker {
     constructor() {
         this.tasks = [];
         this.currentEditingTask = null;
+        this.currentView = 'list'; // 'list', 'week', 'month'
         this.init();
     }
 
@@ -19,6 +20,11 @@ class TimeTracker {
         
         // Form events
         document.getElementById('task-form-element').addEventListener('submit', (e) => this.handleFormSubmit(e));
+        
+        // View selection events
+        document.getElementById('list-view-btn').addEventListener('click', () => this.setView('list'));
+        document.getElementById('week-view-btn').addEventListener('click', () => this.setView('week'));
+        document.getElementById('month-view-btn').addEventListener('click', () => this.setView('month'));
         
         // Filter events
         document.getElementById('filter-btn').addEventListener('click', () => this.filterTasks());
@@ -86,6 +92,21 @@ class TimeTracker {
         this.loadTasks();
     }
 
+    setView(viewType) {
+        this.currentView = viewType;
+        
+        // Update active button
+        document.querySelectorAll('.btn-view').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`${viewType}-view-btn`).classList.add('active');
+        
+        // Update container class for styling
+        const container = document.getElementById('tasks-container');
+        container.className = `${viewType}-view`;
+        
+        // Re-render tasks with new view
+        this.renderTasks();
+    }
+
     async exportTasks() {
         const startDate = document.getElementById('start-date').value;
         const endDate = document.getElementById('end-date').value;
@@ -134,7 +155,132 @@ class TimeTracker {
             return;
         }
 
-        container.innerHTML = this.tasks.map(task => this.createTaskCard(task)).join('');
+        // Sort tasks chronologically by start time
+        const sortedTasks = [...this.tasks].sort((a, b) => {
+            return new Date(a.start_time) - new Date(b.start_time);
+        });
+
+        switch (this.currentView) {
+            case 'week':
+                this.renderWeekView(sortedTasks, container);
+                break;
+            case 'month':
+                this.renderMonthView(sortedTasks, container);
+                break;
+            default: // 'list'
+                this.renderListView(sortedTasks, container);
+                break;
+        }
+    }
+
+    renderListView(tasks, container) {
+        container.innerHTML = tasks.map(task => this.createTaskCard(task)).join('');
+    }
+
+    renderWeekView(tasks, container) {
+        const weekGroups = this.groupTasksByWeek(tasks);
+        let html = '';
+
+        for (const [weekKey, weekTasks] of Object.entries(weekGroups)) {
+            const weekStart = new Date(weekKey);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            
+            const weekTitle = `Week of ${this.formatDateShort(weekStart)} - ${this.formatDateShort(weekEnd)}`;
+            
+            html += `
+                <div class="view-group">
+                    <div class="view-group-header">
+                        <h3 class="view-group-title">${weekTitle}</h3>
+                    </div>
+                    <div class="view-group-tasks">
+                        ${weekTasks.map(task => this.createTaskCard(task)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+    }
+
+    renderMonthView(tasks, container) {
+        const monthGroups = this.groupTasksByMonth(tasks);
+        let html = '';
+
+        for (const [monthKey, monthTasks] of Object.entries(monthGroups)) {
+            const monthDate = new Date(monthKey + '-01');
+            const monthTitle = monthDate.toLocaleString('en-US', { 
+                year: 'numeric', 
+                month: 'long' 
+            });
+            
+            html += `
+                <div class="view-group">
+                    <div class="view-group-header">
+                        <h3 class="view-group-title">${monthTitle}</h3>
+                    </div>
+                    <div class="view-group-tasks">
+                        ${monthTasks.map(task => this.createTaskCard(task)).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+    }
+
+    groupTasksByWeek(tasks) {
+        const groups = {};
+        
+        tasks.forEach(task => {
+            const startDate = new Date(task.start_time);
+            // Get the Monday of the week
+            const monday = new Date(startDate);
+            monday.setDate(startDate.getDate() - (startDate.getDay() || 7) + 1);
+            monday.setHours(0, 0, 0, 0);
+            
+            const weekKey = monday.toISOString().split('T')[0];
+            
+            if (!groups[weekKey]) {
+                groups[weekKey] = [];
+            }
+            groups[weekKey].push(task);
+        });
+
+        // Sort each week's tasks chronologically
+        Object.keys(groups).forEach(weekKey => {
+            groups[weekKey].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+        });
+
+        return groups;
+    }
+
+    groupTasksByMonth(tasks) {
+        const groups = {};
+        
+        tasks.forEach(task => {
+            const startDate = new Date(task.start_time);
+            const monthKey = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`;
+            
+            if (!groups[monthKey]) {
+                groups[monthKey] = [];
+            }
+            groups[monthKey].push(task);
+        });
+
+        // Sort each month's tasks chronologically
+        Object.keys(groups).forEach(monthKey => {
+            groups[monthKey].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+        });
+
+        return groups;
+    }
+
+    formatDateShort(date) {
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric'
+        });
     }
 
     createTaskCard(task) {
