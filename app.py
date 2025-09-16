@@ -41,8 +41,8 @@ class TimeTracker:
             "updated_at": datetime.now().isoformat()
         }
         
-        # Store as JSON in Redis
-        self.redis_client.json().set(task_key, '$', task_data)
+        # Store as JSON string in Redis
+        self.redis_client.set(task_key, json.dumps(task_data))
         
         # Add to index for querying
         self.redis_client.sadd("timetracker:task_ids", task_id)
@@ -53,8 +53,10 @@ class TimeTracker:
         """Get a specific task by ID"""
         task_key = f"{self.key_prefix}{task_id}"
         try:
-            task_data = self.redis_client.json().get(task_key)
-            return task_data
+            task_data = self.redis_client.get(task_key)
+            if task_data:
+                return json.loads(task_data)
+            return None
         except:
             return None
     
@@ -62,12 +64,21 @@ class TimeTracker:
         """Update a task with new values"""
         task_key = f"{self.key_prefix}{task_id}"
         try:
+            # Get existing task
+            existing_data = self.redis_client.get(task_key)
+            if not existing_data:
+                return False
+            
+            task_data = json.loads(existing_data)
+            
             # Update the updated_at timestamp
             kwargs['updated_at'] = datetime.now().isoformat()
             
-            # Update each field
-            for field, value in kwargs.items():
-                self.redis_client.json().set(task_key, f'$.{field}', value)
+            # Update fields
+            task_data.update(kwargs)
+            
+            # Store back to Redis
+            self.redis_client.set(task_key, json.dumps(task_data))
             
             return True
         except:
