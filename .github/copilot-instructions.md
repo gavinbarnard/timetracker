@@ -2,7 +2,9 @@
 
 **ALWAYS reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
 
-This is a Flask-based time tracking web application with Python backend and Redis JSON storage. The target platform is Ubuntu 24.04.
+This is a Flask-based time tracking web application with Python backend and Redis JSON storage. The target platform is Ubuntu 24.04.  This package does not manage
+the redis backend server itself.  The application deployer is expected to setup a proper redis server with JSON and SEARCH backend.   The docker container provides the needed
+functionality.
 
 ## Critical Requirements
 
@@ -10,17 +12,12 @@ This is a Flask-based time tracking web application with Python backend and Redi
 - **ALWAYS preserve Redis JSON calls**: The application relies on Redis JSON functionality which requires Redis Stack
 - **ALWAYS test complete user workflows**: Syntax checks and API tests are not sufficient - run end-to-end scenarios
 
+
 ## Quick Setup and Build (VALIDATED COMMANDS)
 
 ### 1. Install System Dependencies
 ```bash
-# Install Redis from Ubuntu repository (takes ~30 seconds, NEVER CANCEL)
-sudo apt update && sudo apt install redis-server -y
-
-# Stop standard Redis (it lacks JSON support)
-sudo systemctl stop redis-server
-
-# Start Redis Stack with JSON support (takes ~18 seconds, NEVER CANCEL)
+# Start Redis Stack with JSON support using docker as the Ubuntu local packages do not support the JSON backend (takes ~18 seconds, NEVER CANCEL)
 docker run -d -p 6379:6379 -p 8001:8001 redis/redis-stack:latest
 
 # Wait for Redis Stack to be ready (ALWAYS wait 5+ seconds)
@@ -39,7 +36,6 @@ pip3 install -r requirements.txt
 python3 app.py
 ```
 **Application will be available at: http://localhost:5000**
-**RedisInsight management interface at: http://localhost:8001**
 
 ## Validation and Testing
 
@@ -60,7 +56,6 @@ python3 -c "import test_api; print('Test syntax check passed')"
 3. **Manual User Scenario Testing** (CRITICAL):
 - Load web interface: `curl -s http://localhost:5000/`
 - Test health endpoint: `curl http://localhost:5000/health`
-- Test RedisInsight: `curl -s http://localhost:8001/`
 - **ALWAYS manually test task creation workflow in the web UI**
 
 ### Redis JSON Verification
@@ -157,7 +152,7 @@ redis-cli
 
 ### "unknown command 'JSON.SET'" Error:
 - **Cause**: Standard Redis running instead of Redis Stack
-- **Solution**: Stop `redis-server` and start Redis Stack container
+- **Solution**: Ensure Redis is install via docker container during copilot developement
 
 ### Application Won't Start:
 - **Check**: Redis Stack is running (`docker ps | grep redis`)
