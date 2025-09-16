@@ -121,6 +121,15 @@ header p {
     background: #c82333;
 }
 
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #218838;
+}
+
 .tasks-section h2 {
     margin-bottom: 20px;
     color: #333;

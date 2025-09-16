@@ -24,6 +24,9 @@ class TimeTracker {
         document.getElementById('filter-btn').addEventListener('click', () => this.filterTasks());
         document.getElementById('clear-filter-btn').addEventListener('click', () => this.clearFilter());
         
+        // Export events
+        document.getElementById('export-btn').addEventListener('click', () => this.exportTasks());
+        
         // Close modal when clicking outside
         window.addEventListener('click', (e) => {
             const modal = document.getElementById('task-form');
@@ -81,6 +84,40 @@ class TimeTracker {
     clearFilter() {
         this.setDefaultDates();
         this.loadTasks();
+    }
+
+    async exportTasks() {
+        const startDate = document.getElementById('start-date').value;
+        const endDate = document.getElementById('end-date').value;
+        
+        if (!startDate || !endDate) {
+            this.showError('Please select both start and end dates for export');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/export/csv?start_date=${startDate}&end_date=${endDate}`);
+            
+            if (response.ok) {
+                // Create a download link
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `timetracker_export_${startDate}_to_${endDate}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                this.showSuccess('Tasks exported successfully!');
+            } else {
+                const errorData = await response.json();
+                this.showError('Export failed: ' + (errorData.error || 'Unknown error'));
+            }
+        } catch (error) {
+            this.showError('Error exporting tasks: ' + error.message);
+        }
     }
 
     renderTasks() {
