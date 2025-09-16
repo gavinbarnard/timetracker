@@ -1,9 +1,11 @@
 import os
 import json
 import uuid
+import csv
+import io
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, make_response
 from flask_cors import CORS
 import redis
 from dotenv import load_dotenv
@@ -108,6 +110,67 @@ class TimeTracker:
                 filtered_tasks.append(task)
         
         return filtered_tasks
+    
+    def calculate_task_hours(self, task: Dict) -> float:
+        """Calculate the duration of a task in hours"""
+        try:
+            start_time = datetime.fromisoformat(task['start_time'].replace('Z', '+00:00'))
+            end_time = datetime.fromisoformat(task['end_time'].replace('Z', '+00:00'))
+            duration = end_time - start_time
+            return round(duration.total_seconds() / 3600, 2)  # Convert to hours and round to 2 decimal places
+        except (ValueError, KeyError):
+            return 0.0
+    
+    def export_tasks_to_csv(self, start_date: str, end_date: str) -> str:
+        """Export tasks within date range to CSV format"""
+        tasks = self.get_tasks_by_date_range(start_date, end_date)
+        
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow([
+            'Date', 
+            'Description', 
+            'Start Time', 
+            'End Time', 
+            'Duration (Hours)', 
+            'Reference Tickets'
+        ])
+        
+        total_hours = 0.0
+        
+        # Write task data
+        for task in tasks:
+            hours = self.calculate_task_hours(task)
+            total_hours += hours
+            
+            # Format times for display
+            start_time = task.get('start_time', '')
+            end_time = task.get('end_time', '')
+            date = start_time[:10] if start_time else ''
+            start_display = start_time[11:16] if len(start_time) > 10 else ''  # Extract time part HH:MM
+            end_display = end_time[11:16] if len(end_time) > 10 else ''
+            
+            # Format reference tickets
+            tickets = task.get('reference_tickets', [])
+            tickets_str = ', '.join(tickets) if tickets else ''
+            
+            writer.writerow([
+                date,
+                task.get('description', ''),
+                start_display,
+                end_display,
+                hours,
+                tickets_str
+            ])
+        
+        # Add total row
+        writer.writerow([])  # Empty row
+        writer.writerow(['', '', '', 'TOTAL HOURS:', total_hours, ''])
+        
+        return output.getvalue()
 
 # Initialize the time tracker
 tracker = TimeTracker()
@@ -191,6 +254,27 @@ def health_check():
         return jsonify({'status': 'healthy', 'redis': 'connected'})
     except:
         return jsonify({'status': 'unhealthy', 'redis': 'disconnected'}), 500
+
+@app.route('/api/export/csv', methods=['GET'])
+def export_tasks_csv():
+    """Export tasks to CSV format"""
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    if not start_date or not end_date:
+        return jsonify({'error': 'start_date and end_date parameters are required'}), 400
+    
+    try:
+        csv_data = tracker.export_tasks_to_csv(start_date, end_date)
+        
+        # Create response with CSV data
+        response = make_response(csv_data)
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = f'attachment; filename=timetracker_export_{start_date}_to_{end_date}.csv'
+        
+        return response
+    except Exception as e:
+        return jsonify({'error': f'Export failed: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

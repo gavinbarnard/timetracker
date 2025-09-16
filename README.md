@@ -9,6 +9,7 @@ A Python Flask web application for tracking work time with Redis Stack Server ba
 - 🎫 **Reference Tickets**: Link tasks to multiple reference tickets/issues
 - 📝 **Task Descriptions**: Add detailed descriptions and labels for each task
 - 🔍 **Advanced Filtering**: Filter tasks by date range with easy querying
+- 📊 **CSV Export**: Export tasks to spreadsheet format with hours calculation and totals for invoicing
 - 🚀 **Redis Stack JSON**: Fast storage and retrieval using Redis JSON functionality
 - 📱 **Responsive Design**: Works seamlessly on desktop and mobile devices
 
@@ -100,6 +101,16 @@ The application will be available at `http://localhost:5000`
 2. Click "Filter" to show tasks within the selected date range
 3. Click "Clear" to reset the filter
 
+### Exporting Tasks to Spreadsheet
+
+1. Select your desired date range using the date picker controls
+2. Click the "Export CSV" button
+3. The system will automatically download a CSV file containing:
+   - Task details (description, start/end times, reference tickets)
+   - Hours worked for each task
+   - Total hours for the selected time period (perfect for invoicing)
+4. The exported file will be named `timetracker_export_[start_date]_to_[end_date].csv`
+
 ### Viewing Task Details
 
 Each task card displays:
@@ -156,6 +167,17 @@ Content-Type: application/json
 ```http
 DELETE /api/tasks/{task_id}
 ```
+
+### Export Tasks to CSV
+```http
+GET /api/export/csv?start_date=2023-01-01&end_date=2023-01-31
+```
+
+Returns a CSV file containing tasks within the specified date range, including:
+- Task descriptions and times
+- Calculated hours for each task
+- Reference tickets
+- Total hours summary for invoicing
 
 ### Health Check
 ```http
