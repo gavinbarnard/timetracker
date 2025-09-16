@@ -133,10 +133,10 @@ class TimeTracker:
         writer.writerow([
             'Date', 
             'Description', 
+            'Reference Tickets',
             'Start Time', 
             'End Time', 
-            'Duration (Hours)', 
-            'Reference Tickets'
+            'Duration (Hours)'
         ])
         
         total_hours = 0.0
@@ -160,15 +160,15 @@ class TimeTracker:
             writer.writerow([
                 date,
                 task.get('description', ''),
+                tickets_str,
                 start_display,
                 end_display,
-                hours,
-                tickets_str
+                hours
             ])
         
         # Add total row
         writer.writerow([])  # Empty row
-        writer.writerow(['', '', '', 'TOTAL HOURS:', total_hours, ''])
+        writer.writerow(['', '', '', '', 'TOTAL HOURS:', total_hours])
         
         return output.getvalue()
 
