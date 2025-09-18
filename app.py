@@ -211,7 +211,46 @@ class TimeTracker:
         return tasks
     
     def get_tasks_by_date_range(self, start_date: str, end_date: str) -> List[Dict]:
-        """Get tasks within a date range"""
+        """Get tasks within a date range using Redis search index"""
+        # Convert date strings to epoch milliseconds for search
+        start_date_ms = self._iso_to_epoch_ms(start_date + "T00:00:00")
+        end_date_ms = self._iso_to_epoch_ms(end_date + "T23:59:59")
+        
+        try:
+            # Use FT.SEARCH to query the Redis search index directly
+            # This is much more efficient than retrieving all tasks and filtering
+            search_result = self.redis_client.execute_command(
+                'FT.SEARCH', 'timetracker:startTimeIdx',
+                f'@start_time:[{start_date_ms} {end_date_ms}]'
+            )
+            
+            # Parse search results - format is [count, key1, [field_key, field_value], key2, [field_key, field_value], ...]
+            tasks = []
+            if search_result and len(search_result) > 1:
+                # First element is the count, then alternating keys and field data
+                for i in range(1, len(search_result), 2):
+                    if i + 1 < len(search_result):
+                        # search_result[i] is the key, search_result[i+1] is the field data array
+                        field_data = search_result[i + 1]
+                        if isinstance(field_data, list) and len(field_data) >= 2:
+                            # field_data[0] should be "$", field_data[1] should be the JSON string
+                            json_data = field_data[1]
+                            if isinstance(json_data, str):
+                                import json
+                                task_data = json.loads(json_data)
+                                tasks.append(task_data)
+            
+            # Sort by start_time to maintain consistent ordering
+            tasks.sort(key=lambda x: self._normalize_timestamp(x.get('start_time', 0)))
+            return tasks
+            
+        except Exception as e:
+            # Fallback to the original implementation if search fails
+            print(f"Warning: Redis search failed, falling back to in-memory filtering: {e}")
+            return self._get_tasks_by_date_range_fallback(start_date, end_date)
+    
+    def _get_tasks_by_date_range_fallback(self, start_date: str, end_date: str) -> List[Dict]:
+        """Fallback method for date range filtering (original implementation)"""
         all_tasks = self.get_all_tasks()
         filtered_tasks = []
         
