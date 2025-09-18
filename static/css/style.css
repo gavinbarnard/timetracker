@@ -665,3 +665,94 @@ header p {
         font-size: 0.65rem;
     }
 }
+
+/* Monthly Summary Styles */
+.monthly-summary {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin: 20px 0;
+    border: 1px solid #e9ecef;
+}
+
+.summary-header {
+    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+    padding: 15px 20px;
+    border-bottom: 1px solid #e9ecef;
+    border-radius: 10px 10px 0 0;
+}
+
+.summary-header h4 {
+    margin: 0;
+    color: #495057;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.summary-content {
+    padding: 20px;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    font-size: 1rem;
+}
+
+.summary-item:last-child {
+    margin-bottom: 0;
+}
+
+.summary-item label {
+    font-weight: 600;
+    color: #495057;
+    margin-right: 15px;
+}
+
+.total-hours {
+    color: #28a745;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.hourly-rate-input {
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 8px 12px;
+    font-size: 1rem;
+    width: 120px;
+    text-align: right;
+}
+
+.hourly-rate-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.total-pay {
+    color: #007bff;
+    font-weight: 700;
+    font-size: 1.2rem;
+}
+
+/* Responsive adjustments for monthly summary */
+@media (max-width: 768px) {
+    .summary-item {
+        flex-direction: column;
+        align-items: flex-start;
+        margin-bottom: 20px;
+    }
+    
+    .summary-item label {
+        margin-bottom: 5px;
+        margin-right: 0;
+    }
+    
+    .hourly-rate-input {
+        width: 100%;
+        max-width: 200px;
+    }
+}
