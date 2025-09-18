@@ -26,6 +26,8 @@ class TimeTracker:
             decode_responses=True
         )
         self.key_prefix = "timetracker:tasks:"
+        # Migrate existing ASCII timestamps to epoch milliseconds before creating index
+        self._migrate_timestamps()
         self._ensure_search_index()
     
     def _ensure_search_index(self):
@@ -70,6 +72,60 @@ class TimeTracker:
             return int(timestamp)
         else:
             return int(datetime.now().timestamp() * 1000)
+    
+    def _migrate_timestamps(self):
+        """Migrate existing ASCII timestamp entries to epoch milliseconds format"""
+        try:
+            # Get all task IDs
+            task_ids = self.redis_client.smembers("timetracker:task_ids")
+            migrated_count = 0
+            
+            for task_id in task_ids:
+                task_key = f"{self.key_prefix}{task_id}"
+                try:
+                    # Get the task data
+                    task_data = self.redis_client.json().get(task_key)
+                    if not task_data:
+                        continue
+                    
+                    # Check if timestamps need migration (if they're strings)
+                    needs_migration = False
+                    
+                    # Check start_time
+                    if isinstance(task_data.get('start_time'), str):
+                        task_data['start_time'] = self._normalize_timestamp(task_data['start_time'])
+                        needs_migration = True
+                    
+                    # Check end_time
+                    if isinstance(task_data.get('end_time'), str):
+                        task_data['end_time'] = self._normalize_timestamp(task_data['end_time'])
+                        needs_migration = True
+                    
+                    # Check created_at
+                    if isinstance(task_data.get('created_at'), str):
+                        task_data['created_at'] = self._normalize_timestamp(task_data['created_at'])
+                        needs_migration = True
+                    
+                    # Check updated_at
+                    if isinstance(task_data.get('updated_at'), str):
+                        task_data['updated_at'] = self._normalize_timestamp(task_data['updated_at'])
+                        needs_migration = True
+                    
+                    # If migration was needed, update the task
+                    if needs_migration:
+                        self.redis_client.json().set(task_key, '$', task_data)
+                        migrated_count += 1
+                        
+                except Exception as e:
+                    # Skip individual task migration errors
+                    continue
+            
+            if migrated_count > 0:
+                print(f"Migrated {migrated_count} tasks from ASCII timestamps to epoch milliseconds")
+                
+        except Exception as e:
+            # Migration errors are non-fatal, but log them
+            print(f"Warning: Timestamp migration encountered an error: {e}")
         
     def create_task(self, description: str, start_time: str, end_time: str, 
                    reference_tickets: List[str] = None) -> str:
