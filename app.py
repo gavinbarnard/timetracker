@@ -219,9 +219,11 @@ class TimeTracker:
         try:
             # Use FT.SEARCH to query the Redis search index directly
             # This is much more efficient than retrieving all tasks and filtering
+            # Use LIMIT 0 10000 to get up to 10000 results (Redis limit)
             search_result = self.redis_client.execute_command(
                 'FT.SEARCH', 'timetracker:startTimeIdx',
-                f'@start_time:[{start_date_ms} {end_date_ms}]'
+                f'@start_time:[{start_date_ms} {end_date_ms}]',
+                'LIMIT', '0', '10000'  # Redis maximum limit
             )
             
             # Parse search results - format is [count, key1, [field_key, field_value], key2, [field_key, field_value], ...]
@@ -446,4 +448,5 @@ def export_tasks_csv():
         return jsonify({'error': f'Export failed: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.getenv('FLASK_PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
