@@ -385,7 +385,37 @@ class TimeTracker {
             `;
         }
 
+        // Calculate monthly summary
+        let totalHours = 0;
+        const monthlyTasks = this.filterTasksForMonthView(tasks, startDate);
+        monthlyTasks.forEach(task => {
+            const startTime = new Date(task.start_time);
+            const endTime = new Date(task.end_time);
+            totalHours += this.calculateDurationInHours(startTime, endTime);
+        });
+
         html += `
+                    </div>
+                </div>
+                <div class="monthly-summary">
+                    <div class="summary-header">
+                        <h4>Monthly Summary</h4>
+                    </div>
+                    <div class="summary-content">
+                        <div class="summary-item">
+                            <label>Total Hours Worked:</label>
+                            <span class="total-hours">${totalHours.toFixed(2)} hours</span>
+                        </div>
+                        <div class="summary-item">
+                            <label for="hourly-rate">Hourly Rate ($):</label>
+                            <input type="number" id="hourly-rate" class="hourly-rate-input" 
+                                   placeholder="0.00" step="0.01" min="0"
+                                   oninput="timeTracker.updateTotalPay(${totalHours})">
+                        </div>
+                        <div class="summary-item">
+                            <label>Total Pay:</label>
+                            <span class="total-pay">$0.00</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -674,6 +704,11 @@ class TimeTracker {
         }
     }
 
+    calculateDurationInHours(startTime, endTime) {
+        const diffMs = endTime - startTime;
+        return Math.round((diffMs / (1000 * 60 * 60)) * 100) / 100; // Round to 2 decimal places
+    }
+
     formatDateTime(date) {
         return date.toLocaleString('en-US', {
             weekday: 'short',
@@ -741,6 +776,17 @@ class TimeTracker {
                 document.body.removeChild(notification);
             }, 300);
         }, 3000);
+    }
+
+    updateTotalPay(totalHours) {
+        const hourlyRateInput = document.getElementById('hourly-rate');
+        const totalPayElement = document.querySelector('.total-pay');
+        
+        if (hourlyRateInput && totalPayElement) {
+            const hourlyRate = parseFloat(hourlyRateInput.value) || 0;
+            const totalPay = totalHours * hourlyRate;
+            totalPayElement.textContent = `$${totalPay.toFixed(2)}`;
+        }
     }
 }
 
