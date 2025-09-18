@@ -279,7 +279,7 @@ header p {
     padding: 30px;
     border-radius: 10px;
     width: 90%;
-    max-width: 500px;
+    max-width: 600px;
     position: relative;
     animation: modalSlideIn 0.3s ease;
 }
@@ -334,6 +334,11 @@ header p {
     border-radius: 5px;
     font-size: 14px;
     transition: border-color 0.3s ease;
+}
+
+/* Ensure datetime-local inputs use system font, not monospace */
+.form-group input[type="datetime-local"] {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 .form-group input:focus,
