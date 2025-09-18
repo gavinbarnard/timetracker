@@ -221,8 +221,7 @@ class TimeTracker:
             # This is much more efficient than retrieving all tasks and filtering
             search_result = self.redis_client.execute_command(
                 'FT.SEARCH', 'timetracker:startTimeIdx',
-                f'@start_time:[{start_date_ms} {end_date_ms}]',
-                'DIALECT', '2'
+                f'@start_time:[{start_date_ms} {end_date_ms}]'
             )
             
             # Parse search results - format is [count, key1, [field_key, field_value], key2, [field_key, field_value], ...]
