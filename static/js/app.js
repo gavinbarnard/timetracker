@@ -571,17 +571,22 @@ class TimeTracker {
         e.preventDefault();
         
         const formData = new FormData(e.target);
+        
+        // Convert datetime-local inputs to UTC ISO strings for consistent backend storage
+        const startTimeLocal = formData.get('start_time');
+        const endTimeLocal = formData.get('end_time');
+        
         const taskData = {
             description: formData.get('description'),
-            start_time: formData.get('start_time'),
-            end_time: formData.get('end_time'),
+            start_time: new Date(startTimeLocal).toISOString(),
+            end_time: new Date(endTimeLocal).toISOString(),
             reference_tickets: formData.get('reference_tickets')
                 ? formData.get('reference_tickets').split(',').map(s => s.trim()).filter(s => s)
                 : []
         };
 
-        // Validation
-        if (new Date(taskData.start_time) >= new Date(taskData.end_time)) {
+        // Validation using local time objects for comparison
+        if (new Date(startTimeLocal) >= new Date(endTimeLocal)) {
             this.showError('End time must be after start time');
             return;
         }
