@@ -107,6 +107,25 @@ class PerformanceTestSuite:
         with open(data_file, 'r') as f:
             tasks = json.load(f)
         
+        # First ensure the search index is created
+        print("Creating Redis search index...")
+        try:
+            # Drop index if it exists
+            try:
+                self.redis_client.execute_command('FT.DROPINDEX', 'timetracker:startTimeIdx')
+            except:
+                pass
+            
+            # Create fresh index
+            self.redis_client.execute_command(
+                'FT.CREATE', 'timetracker:startTimeIdx',
+                'ON', 'JSON',
+                'SCHEMA', '$.start_time', 'AS', 'start_time', 'NUMERIC'
+            )
+            print("Search index created successfully")
+        except Exception as e:
+            print(f"Warning: Could not create search index: {e}")
+        
         loaded_count = 0
         batch_size = 100
         
@@ -139,6 +158,27 @@ class PerformanceTestSuite:
                 print(f"Loaded {loaded_count}/{len(tasks)} tasks...")
         
         print(f"Loaded {loaded_count} tasks into test database")
+        
+        # Verify data loading with a quick search
+        try:
+            # Test with a broad date range
+            start_ms = int(datetime(2024, 1, 1).timestamp() * 1000)
+            end_ms = int(datetime(2024, 12, 31, 23, 59, 59).timestamp() * 1000)
+            
+            search_result = self.redis_client.execute_command(
+                'FT.SEARCH', 'timetracker:startTimeIdx',
+                f'@start_time:[{start_ms} {end_ms}]'
+            )
+            
+            if search_result and len(search_result) > 1:
+                found_count = search_result[0]
+                print(f"Verification: Search index found {found_count} tasks for 2024")
+            else:
+                print("Warning: Search index verification found no tasks")
+                
+        except Exception as e:
+            print(f"Warning: Could not verify search index: {e}")
+        
         return loaded_count
     
     def measure_api_performance(self, endpoint: str, params: Dict = None, iterations: int = 10) -> Dict:
@@ -159,6 +199,12 @@ class PerformanceTestSuite:
                         'duration': end_time - start_time,
                         'task_count': task_count
                     })
+                    
+                    # Debug output for first iteration
+                    if i == 0:
+                        print(f"  API response: {task_count} tasks returned")
+                        if params:
+                            print(f"  Query params: {params}")
                 else:
                     errors += 1
                     print(f"Error response {response.status_code} for {endpoint}")
