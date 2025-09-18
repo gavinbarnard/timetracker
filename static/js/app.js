@@ -686,7 +686,15 @@ class TimeTracker {
     }
 
     formatDateTimeForInput(date) {
-        return date.toISOString().slice(0, 16);
+        // Format date for datetime-local input in user's local timezone
+        // HTML datetime-local inputs expect YYYY-MM-DDTHH:MM format in local time
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
 
     escapeHtml(text) {
