@@ -81,10 +81,13 @@ class PerformanceTestSuite:
         env['FLASK_PORT'] = '5001'
         env['FLASK_ENV'] = 'testing'
         
+        # Get the directory containing this script (where app.py should be located)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
         # Start Flask app on different port
         self.app_process = subprocess.Popen([
             'python3', 'app.py'
-        ], env=env, cwd='/home/runner/work/timetracker/timetracker')
+        ], env=env, cwd=script_dir)
         
         # Wait for app to start
         print("Waiting for Flask app to start...")

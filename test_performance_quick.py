@@ -42,9 +42,12 @@ def quick_test():
         env['REDIS_PORT'] = '6381'
         env['FLASK_PORT'] = '5002'
         
+        # Get the directory containing this script (where app.py should be located)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
         app_process = subprocess.Popen([
             'python3', 'app.py'
-        ], env=env)
+        ], env=env, cwd=script_dir)
         
         # Wait for app
         print("Waiting for Flask app...")
