@@ -26,6 +26,50 @@ class TimeTracker:
             decode_responses=True
         )
         self.key_prefix = "timetracker:tasks:"
+        self._ensure_search_index()
+    
+    def _ensure_search_index(self):
+        """Create Redis search index for start_time if it doesn't exist"""
+        try:
+            # Check if index already exists
+            existing_indexes = self.redis_client.execute_command('FT._LIST')
+            if 'timetracker:startTimeIdx' not in existing_indexes:
+                # Create index on start_time field as integer
+                self.redis_client.execute_command(
+                    'FT.CREATE', 'timetracker:startTimeIdx',
+                    'ON', 'JSON',
+                    'SCHEMA', '$.start_time', 'AS', 'start_time', 'NUMERIC'
+                )
+        except Exception as e:
+            # Index creation might fail if it already exists, which is okay
+            pass
+    
+    def _iso_to_epoch_ms(self, iso_string: str) -> int:
+        """Convert ISO format string to epoch milliseconds"""
+        try:
+            dt = datetime.fromisoformat(iso_string.replace('Z', '+00:00'))
+            return int(dt.timestamp() * 1000)
+        except (ValueError, AttributeError):
+            # If conversion fails, assume it's already an integer
+            return int(iso_string) if isinstance(iso_string, (str, int, float)) else 0
+    
+    def _epoch_ms_to_iso(self, epoch_ms: int) -> str:
+        """Convert epoch milliseconds to ISO format string"""
+        try:
+            dt = datetime.fromtimestamp(epoch_ms / 1000)
+            return dt.isoformat()
+        except (ValueError, TypeError):
+            # If conversion fails, return current time
+            return datetime.now().isoformat()
+    
+    def _normalize_timestamp(self, timestamp) -> int:
+        """Normalize timestamp to epoch milliseconds, handling both formats"""
+        if isinstance(timestamp, str):
+            return self._iso_to_epoch_ms(timestamp)
+        elif isinstance(timestamp, (int, float)):
+            return int(timestamp)
+        else:
+            return int(datetime.now().timestamp() * 1000)
         
     def create_task(self, description: str, start_time: str, end_time: str, 
                    reference_tickets: List[str] = None) -> str:
@@ -33,14 +77,19 @@ class TimeTracker:
         task_id = str(uuid.uuid4())
         task_key = f"{self.key_prefix}{task_id}"
         
+        # Convert timestamps to epoch milliseconds
+        start_time_ms = self._normalize_timestamp(start_time)
+        end_time_ms = self._normalize_timestamp(end_time)
+        created_at_ms = int(datetime.now().timestamp() * 1000)
+        
         task_data = {
             "id": task_id,
             "description": description,
-            "start_time": start_time,
-            "end_time": end_time,
+            "start_time": start_time_ms,
+            "end_time": end_time_ms,
             "reference_tickets": reference_tickets or [],
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
+            "created_at": created_at_ms,
+            "updated_at": created_at_ms
         }
         
         # Store as JSON in Redis
@@ -65,7 +114,13 @@ class TimeTracker:
         task_key = f"{self.key_prefix}{task_id}"
         try:
             # Update the updated_at timestamp
-            kwargs['updated_at'] = datetime.now().isoformat()
+            kwargs['updated_at'] = int(datetime.now().timestamp() * 1000)
+            
+            # Convert timestamp fields to epoch milliseconds if they're being updated
+            if 'start_time' in kwargs:
+                kwargs['start_time'] = self._normalize_timestamp(kwargs['start_time'])
+            if 'end_time' in kwargs:
+                kwargs['end_time'] = self._normalize_timestamp(kwargs['end_time'])
             
             # Update each field
             for field, value in kwargs.items():
@@ -95,8 +150,8 @@ class TimeTracker:
             if task:
                 tasks.append(task)
         
-        # Sort by start_time
-        tasks.sort(key=lambda x: x.get('start_time', ''))
+        # Sort by start_time (handling both integer and string formats)
+        tasks.sort(key=lambda x: self._normalize_timestamp(x.get('start_time', 0)))
         return tasks
     
     def get_tasks_by_date_range(self, start_date: str, end_date: str) -> List[Dict]:
@@ -104,9 +159,13 @@ class TimeTracker:
         all_tasks = self.get_all_tasks()
         filtered_tasks = []
         
+        # Convert date strings to epoch milliseconds for comparison
+        start_date_ms = self._iso_to_epoch_ms(start_date + "T00:00:00")
+        end_date_ms = self._iso_to_epoch_ms(end_date + "T23:59:59")
+        
         for task in all_tasks:
-            task_date = task.get('start_time', '')[:10]  # Extract date part
-            if start_date <= task_date <= end_date:
+            task_start_time = self._normalize_timestamp(task.get('start_time', 0))
+            if start_date_ms <= task_start_time <= end_date_ms:
                 filtered_tasks.append(task)
         
         return filtered_tasks
@@ -114,10 +173,10 @@ class TimeTracker:
     def calculate_task_hours(self, task: Dict) -> float:
         """Calculate the duration of a task in hours"""
         try:
-            start_time = datetime.fromisoformat(task['start_time'].replace('Z', '+00:00'))
-            end_time = datetime.fromisoformat(task['end_time'].replace('Z', '+00:00'))
-            duration = end_time - start_time
-            return round(duration.total_seconds() / 3600, 2)  # Convert to hours and round to 2 decimal places
+            start_time_ms = self._normalize_timestamp(task['start_time'])
+            end_time_ms = self._normalize_timestamp(task['end_time'])
+            duration_ms = end_time_ms - start_time_ms
+            return round(duration_ms / (1000 * 3600), 2)  # Convert to hours and round to 2 decimal places
         except (ValueError, KeyError):
             return 0.0
     
@@ -146,12 +205,16 @@ class TimeTracker:
             hours = self.calculate_task_hours(task)
             total_hours += hours
             
-            # Format times for display
-            start_time = task.get('start_time', '')
-            end_time = task.get('end_time', '')
-            date = start_time[:10] if start_time else ''
-            start_display = start_time[11:16] if len(start_time) > 10 else ''  # Extract time part HH:MM
-            end_display = end_time[11:16] if len(end_time) > 10 else ''
+            # Convert timestamps to display format
+            start_time_ms = self._normalize_timestamp(task.get('start_time', 0))
+            end_time_ms = self._normalize_timestamp(task.get('end_time', 0))
+            
+            start_dt = datetime.fromtimestamp(start_time_ms / 1000)
+            end_dt = datetime.fromtimestamp(end_time_ms / 1000)
+            
+            date = start_dt.strftime('%Y-%m-%d')
+            start_display = start_dt.strftime('%H:%M')
+            end_display = end_dt.strftime('%H:%M')
             
             # Format reference tickets
             tickets = task.get('reference_tickets', [])
