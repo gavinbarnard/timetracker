@@ -69,15 +69,40 @@ class TimeTracker {
         const startDate = document.getElementById('start-date').value;
         const endDate = document.getElementById('end-date').value;
         
-        if (!startDate || !endDate) {
-            this.showError('Please select both start and end dates');
-            return;
+        // Validate required dates based on view type
+        if (this.currentView === 'list') {
+            if (!startDate || !endDate) {
+                this.showError('Please select both start and end dates');
+                return;
+            }
+        } else {
+            if (!startDate) {
+                this.showError('Please select a start date');
+                return;
+            }
         }
         
         try {
-            const response = await fetch(`/api/tasks?start_date=${startDate}&end_date=${endDate}`);
+            let response;
+            if (this.currentView === 'list') {
+                // List view uses both dates
+                response = await fetch(`/api/tasks?start_date=${startDate}&end_date=${endDate}`);
+            } else {
+                // Week and month views only use start date, but we'll fetch all tasks and filter client-side
+                response = await fetch('/api/tasks');
+            }
+            
             if (response.ok) {
-                this.tasks = await response.json();
+                let tasks = await response.json();
+                
+                // For week and month views, filter tasks based on the specific view logic
+                if (this.currentView === 'week') {
+                    tasks = this.filterTasksForWeekView(tasks, startDate);
+                } else if (this.currentView === 'month') {
+                    tasks = this.filterTasksForMonthView(tasks, startDate);
+                }
+                
+                this.tasks = tasks;
                 this.renderTasks();
             } else {
                 this.showError('Failed to filter tasks');
@@ -90,6 +115,36 @@ class TimeTracker {
     clearFilter() {
         this.setDefaultDates();
         this.loadTasks();
+    }
+
+    filterTasksForWeekView(tasks, startDate) {
+        const weekStart = new Date(startDate);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        
+        return tasks.filter(task => {
+            const taskDate = new Date(task.start_time);
+            taskDate.setHours(0, 0, 0, 0);
+            weekStart.setHours(0, 0, 0, 0);
+            weekEnd.setHours(23, 59, 59, 999);
+            
+            return taskDate >= weekStart && taskDate <= weekEnd;
+        });
+    }
+
+    filterTasksForMonthView(tasks, startDate) {
+        const selectedDate = new Date(startDate);
+        const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        const monthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        
+        return tasks.filter(task => {
+            const taskDate = new Date(task.start_time);
+            taskDate.setHours(0, 0, 0, 0);
+            monthStart.setHours(0, 0, 0, 0);
+            monthEnd.setHours(23, 59, 59, 999);
+            
+            return taskDate >= monthStart && taskDate <= monthEnd;
+        });
     }
 
     setView(viewType) {
@@ -178,54 +233,164 @@ class TimeTracker {
     }
 
     renderWeekView(tasks, container) {
-        const weekGroups = this.groupTasksByWeek(tasks);
-        let html = '';
+        const startDate = document.getElementById('start-date').value;
+        if (!startDate) {
+            container.innerHTML = '<div class="empty-state"><p>Please select a start date to view the week</p></div>';
+            return;
+        }
 
-        for (const [weekKey, weekTasks] of Object.entries(weekGroups)) {
-            const weekStart = new Date(weekKey);
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekStart.getDate() + 6);
+        const weekStart = new Date(startDate);
+        weekStart.setHours(0, 0, 0, 0);
+
+        // Group tasks by day
+        const dayGroups = {};
+        
+        // Initialize all 7 days
+        for (let i = 0; i < 7; i++) {
+            const currentDay = new Date(weekStart);
+            currentDay.setDate(weekStart.getDate() + i);
+            const dayKey = currentDay.toISOString().split('T')[0];
+            dayGroups[dayKey] = [];
+        }
+
+        // Add tasks to appropriate days
+        tasks.forEach(task => {
+            const taskDate = new Date(task.start_time);
+            const dayKey = taskDate.toISOString().split('T')[0];
+            if (dayGroups[dayKey]) {
+                dayGroups[dayKey].push(task);
+            }
+        });
+
+        // Sort tasks within each day chronologically
+        Object.keys(dayGroups).forEach(dayKey => {
+            dayGroups[dayKey].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+        });
+
+        // Create the 7-day layout
+        let html = '<div class="week-grid">';
+        
+        for (let i = 0; i < 7; i++) {
+            const currentDay = new Date(weekStart);
+            currentDay.setDate(weekStart.getDate() + i);
+            const dayKey = currentDay.toISOString().split('T')[0];
+            const dayTasks = dayGroups[dayKey] || [];
             
-            const weekTitle = `Week of ${this.formatDateShort(weekStart)} - ${this.formatDateShort(weekEnd)}`;
+            const dayName = currentDay.toLocaleDateString('en-US', { weekday: 'short' });
+            const dayNumber = currentDay.getDate();
             
             html += `
-                <div class="view-group">
-                    <div class="view-group-header">
-                        <h3 class="view-group-title">${weekTitle}</h3>
+                <div class="week-day">
+                    <div class="week-day-header">
+                        <div class="day-name">${dayName}</div>
+                        <div class="day-number">${dayNumber}</div>
                     </div>
-                    <div class="view-group-tasks">
-                        ${weekTasks.map(task => this.createTaskCard(task)).join('')}
+                    <div class="week-day-tasks">
+                        ${dayTasks.map(task => this.createWeekTaskCard(task)).join('')}
                     </div>
                 </div>
             `;
         }
-
+        
+        html += '</div>';
         container.innerHTML = html;
     }
 
     renderMonthView(tasks, container) {
-        const monthGroups = this.groupTasksByMonth(tasks);
-        let html = '';
+        const startDate = document.getElementById('start-date').value;
+        if (!startDate) {
+            container.innerHTML = '<div class="empty-state"><p>Please select a start date to view the month</p></div>';
+            return;
+        }
 
-        for (const [monthKey, monthTasks] of Object.entries(monthGroups)) {
-            const monthDate = new Date(monthKey + '-01');
-            const monthTitle = monthDate.toLocaleString('en-US', { 
-                year: 'numeric', 
-                month: 'long' 
-            });
+        const selectedDate = new Date(startDate);
+        const year = selectedDate.getFullYear();
+        const month = selectedDate.getMonth();
+        
+        const monthStart = new Date(year, month, 1);
+        const monthEnd = new Date(year, month + 1, 0);
+        const daysInMonth = monthEnd.getDate();
+        
+        // Get the first day of the week (0 = Sunday, 1 = Monday, etc.)
+        const firstDayOfWeek = monthStart.getDay();
+        
+        // Group tasks by day
+        const dayGroups = {};
+        
+        // Initialize all days in the month
+        for (let day = 1; day <= daysInMonth; day++) {
+            const currentDay = new Date(year, month, day);
+            const dayKey = currentDay.toISOString().split('T')[0];
+            dayGroups[dayKey] = [];
+        }
+
+        // Add tasks to appropriate days
+        tasks.forEach(task => {
+            const taskDate = new Date(task.start_time);
+            const dayKey = taskDate.toISOString().split('T')[0];
+            if (dayGroups[dayKey]) {
+                dayGroups[dayKey].push(task);
+            }
+        });
+
+        // Sort tasks within each day chronologically
+        Object.keys(dayGroups).forEach(dayKey => {
+            dayGroups[dayKey].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+        });
+
+        const monthTitle = selectedDate.toLocaleString('en-US', { 
+            year: 'numeric', 
+            month: 'long' 
+        });
+
+        // Create calendar grid
+        let html = `
+            <div class="month-calendar">
+                <div class="month-header">
+                    <h3>${monthTitle}</h3>
+                </div>
+                <div class="calendar-grid">
+                    <div class="calendar-weekdays">
+                        <div class="weekday">M</div>
+                        <div class="weekday">T</div>
+                        <div class="weekday">W</div>
+                        <div class="weekday">Th</div>
+                        <div class="weekday">F</div>
+                        <div class="weekday">S</div>
+                        <div class="weekday">Su</div>
+                    </div>
+                    <div class="calendar-days">
+        `;
+
+        // Add empty cells for days before the first day of the month
+        // Adjust for Monday start (0 = Sunday, 1 = Monday)
+        const mondayFirstDay = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+        for (let i = 0; i < mondayFirstDay; i++) {
+            html += '<div class="calendar-day empty"></div>';
+        }
+
+        // Add all days in the month
+        for (let day = 1; day <= daysInMonth; day++) {
+            const currentDay = new Date(year, month, day);
+            const dayKey = currentDay.toISOString().split('T')[0];
+            const dayTasks = dayGroups[dayKey] || [];
             
             html += `
-                <div class="view-group">
-                    <div class="view-group-header">
-                        <h3 class="view-group-title">${monthTitle}</h3>
-                    </div>
-                    <div class="view-group-tasks">
-                        ${monthTasks.map(task => this.createTaskCard(task)).join('')}
+                <div class="calendar-day">
+                    <div class="day-number">${day}</div>
+                    <div class="day-tasks">
+                        ${dayTasks.map(task => this.createMonthTaskCard(task)).join('')}
                     </div>
                 </div>
             `;
         }
 
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+        
         container.innerHTML = html;
     }
 
@@ -328,6 +493,42 @@ class TimeTracker {
                 </div>
                 
                 ${ticketsHtml}
+            </div>
+        `;
+    }
+
+    createWeekTaskCard(task) {
+        const startTime = new Date(task.start_time);
+        const endTime = new Date(task.end_time);
+        const duration = this.calculateDuration(startTime, endTime);
+        
+        const timeStr = startTime.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            hour12: false 
+        });
+
+        return `
+            <div class="week-task-card" data-task-id="${task.id}" onclick="timeTracker.editTask('${task.id}')">
+                <div class="week-task-time">${timeStr}</div>
+                <div class="week-task-description">${this.escapeHtml(task.description)}</div>
+                <div class="week-task-duration">${duration}</div>
+            </div>
+        `;
+    }
+
+    createMonthTaskCard(task) {
+        const startTime = new Date(task.start_time);
+        const timeStr = startTime.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            hour12: false 
+        });
+
+        return `
+            <div class="month-task-card" data-task-id="${task.id}" onclick="timeTracker.editTask('${task.id}')">
+                <div class="month-task-time">${timeStr}</div>
+                <div class="month-task-description">${this.escapeHtml(task.description)}</div>
             </div>
         `;
     }
